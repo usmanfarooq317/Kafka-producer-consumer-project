@@ -1,62 +1,225 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Kafka Dashboard</title>
+    <title>Kafka Dashboard with Elasticsearch</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-panel {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .status-item {
+            background: rgba(255,255,255,0.1);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .panel {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .panel h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        
+        #message-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        input, select, textarea {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        .messages-container {
+            height: 500px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 5px;
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        
+        .message {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .links {
+            padding: 20px;
+            background: #f8f9fa;
+            border-top: 1px solid #ddd;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .link-button {
+            background: #27ae60;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .link-button:hover {
+            background: #219653;
+        }
+        
+        .elasticsearch-info {
+            background: #e8f4fc;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 14px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Kafka Dashboard</h1>
-            <div class="status">
-                <span id="kafka-status">Connected</span>
-                <span id="message-count">Messages: 0</span>
+            <h1>📊 Kafka + Elasticsearch Dashboard</h1>
+            <div class="status-panel">
+                <div class="status-item" id="kafka-status">🔴 Kafka: Connecting...</div>
+                <div class="status-item" id="es-status">🔴 ES: Connecting...</div>
+                <div class="status-item" id="message-count">📨 Messages: 0</div>
+                <div class="status-item" id="es-count">📊 ES Docs: 0</div>
             </div>
         </header>
 
         <div class="dashboard">
             <div class="panel">
-                <h2>Send Message</h2>
+                <h2>📨 Send Message</h2>
                 <form id="message-form">
-                    <input type="text" id="sender" placeholder="Your name" value="User">
+                    <input type="text" id="sender" placeholder="Your Name" value="User" required>
                     <select id="category">
-                        <option value="info">Info</option>
-                        <option value="alert">Alert</option>
-                        <option value="warning">Warning</option>
+                        <option value="info">ℹ️ Information</option>
+                        <option value="alert">⚠️ Alert</option>
+                        <option value="warning">🚨 Warning</option>
+                        <option value="success">✅ Success</option>
                     </select>
-                    <textarea id="message" placeholder="Enter message..."></textarea>
-                    <button type="submit">Send to Kafka</button>
+                    <textarea id="message" placeholder="Type your message here..." required rows="4"></textarea>
+                    <button type="submit">🚀 Send to Kafka & Elasticsearch</button>
                 </form>
                 <div id="send-status"></div>
+                
+                <div class="elasticsearch-info">
+                    <h3>Elasticsearch Status</h3>
+                    <p>Data is sent to:</p>
+                    <ul>
+                        <li>Kafka Topic: <code>dashboard-messages</code></li>
+                        <li>Elasticsearch Index: <code>kafka-dashboard-YYYY.MM.DD</code></li>
+                        <li>Kibana: <a href="http://localhost:5601" target="_blank">http://localhost:5601</a></li>
+                    </ul>
+                    <button onclick="checkElasticsearch()" style="margin-top: 10px; background: #8e44ad;">🔍 Check ES Data</button>
+                </div>
             </div>
 
             <div class="panel">
-                <h2>Live Messages</h2>
-                <div class="messages" id="messages">
-                    <div class="empty">No messages yet</div>
+                <h2>📝 Live Messages</h2>
+                <div class="messages-container" id="messages">
+                    <div class="empty" style="text-align: center; padding: 40px; color: #95a5a6;">
+                        <h3>No messages yet</h3>
+                        <p>Send a message to see it appear here in real-time!</p>
+                    </div>
                 </div>
             </div>
         </div>
 
         <div class="links">
-            <a href="http://localhost:5601" target="_blank">Kibana Dashboard</a>
-            <a href="http://localhost:9200" target="_blank">Elasticsearch API</a>
+            <a href="http://localhost:5000/api/health" target="_blank" class="link-button">🏥 Health Check</a>
+            <a href="http://localhost:5601" target="_blank" class="link-button">📈 Open Kibana</a>
+            <a href="http://localhost:9200" target="_blank" class="link-button">🔍 Elasticsearch API</a>
+            <a href="http://localhost:5000/api/elasticsearch/indices" target="_blank" class="link-button">📁 List Indices</a>
+            <button onclick="clearMessages()" class="link-button" style="background: #e74c3c;">🗑️ Clear Messages</button>
         </div>
     </div>
 
     <script>
         const socket = io();
         let messageCount = 0;
+        let esDocCount = 0;
 
+        // Initialize
+        updateStatus();
+        setInterval(updateStatus, 10000); // Update every 10 seconds
+
+        // Connection handlers
         socket.on('connect', () => {
             console.log('Connected to server');
-            document.getElementById('kafka-status').textContent = 'Connected';
+            document.getElementById('kafka-status').innerHTML = '🟢 Kafka: Connected';
         });
 
         socket.on('new_message', (data) => {
             messageCount++;
-            document.getElementById('message-count').textContent = `Messages: ${messageCount}`;
+            document.getElementById('message-count').textContent = `📨 Messages: ${messageCount}`;
             
             const messagesDiv = document.getElementById('messages');
             const emptyMsg = messagesDiv.querySelector('.empty');
@@ -65,10 +228,17 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message';
             messageDiv.innerHTML = `
-                <strong>${data.sender}</strong>
-                <span class="category ${data.category}">${data.category}</span>
-                <p>${data.message}</p>
-                <small>${new Date(data.timestamp).toLocaleTimeString()}</small>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                    <strong>👤 ${data.sender}</strong>
+                    <small>🕒 ${new Date(data.timestamp).toLocaleTimeString()}</small>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <span style="background: #3498db; color: white; padding: 3px 10px; border-radius: 15px; font-size: 12px;">
+                        ${data.category.toUpperCase()}
+                    </span>
+                </div>
+                <div style="color: #2c3e50;">${data.message}</div>
+                ${data.value ? `<div style="margin-top: 10px; font-size: 12px; color: #7f8c8d;">Value: ${data.value}</div>` : ''}
             `;
             messagesDiv.prepend(messageDiv);
         });
@@ -76,20 +246,28 @@
         socket.on('send_status', (data) => {
             const statusDiv = document.getElementById('send-status');
             if (data.success) {
-                statusDiv.innerHTML = `<span class="success">✓ Sent (offset: ${data.offset})</span>`;
+                statusDiv.innerHTML = `<div style="background: #d5f4e6; color: #27ae60; padding: 10px; border-radius: 5px;">
+                    ✅ Sent to Kafka (offset: ${data.offset})${data.elasticsearch_id ? ` and ES (id: ${data.elasticsearch_id})` : ''}
+                </div>`;
             } else {
-                statusDiv.innerHTML = `<span class="error">✗ Failed: ${data.error}</span>`;
+                statusDiv.innerHTML = `<div style="background: #fadbd8; color: #e74c3c; padding: 10px; border-radius: 5px;">
+                    ❌ Failed: ${data.error}
+                </div>`;
             }
-            setTimeout(() => statusDiv.innerHTML = '', 3000);
+            setTimeout(() => statusDiv.innerHTML = '', 5000);
         });
 
+        // Form submission
         document.getElementById('message-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            const sender = document.getElementById('sender').value;
+            const sender = document.getElementById('sender').value.trim();
             const category = document.getElementById('category').value;
-            const message = document.getElementById('message').value;
+            const message = document.getElementById('message').value.trim();
             
-            if (!message.trim()) return;
+            if (!message || !sender) {
+                alert('Please fill in all fields');
+                return;
+            }
             
             socket.emit('send_message', {
                 sender: sender,
@@ -100,6 +278,56 @@
             
             document.getElementById('message').value = '';
         });
+
+        // Update status function
+        function updateStatus() {
+            fetch('/api/health')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('kafka-status').innerHTML = 
+                        data.kafka === 'connected' ? '🟢 Kafka: Connected' : '🔴 Kafka: Disconnected';
+                    document.getElementById('es-status').innerHTML = 
+                        data.elasticsearch === 'connected' ? '🟢 ES: Connected' : '🔴 ES: Disconnected';
+                })
+                .catch(() => {
+                    document.getElementById('kafka-status').innerHTML = '🔴 Kafka: Error';
+                    document.getElementById('es-status').innerHTML = '🔴 ES: Error';
+                });
+            
+            // Check Elasticsearch document count
+            fetch('/api/elasticsearch/search')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.hits && data.hits.total) {
+                        esDocCount = typeof data.hits.total === 'object' ? data.hits.total.value : data.hits.total;
+                        document.getElementById('es-count').textContent = `📊 ES Docs: ${esDocCount}`;
+                    }
+                });
+        }
+
+        function checkElasticsearch() {
+            fetch('/api/elasticsearch/indices')
+                .then(response => response.json())
+                .then(data => {
+                    alert('Elasticsearch Indices:\n' + 
+                        (data.indices ? data.indices.map(i => `${i.index} (docs: ${i['docs.count']})`).join('\n') : 'No indices found'));
+                })
+                .catch(error => {
+                    alert('Error checking Elasticsearch: ' + error);
+                });
+        }
+
+        function clearMessages() {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = `
+                <div class="empty" style="text-align: center; padding: 40px; color: #95a5a6;">
+                    <h3>No messages yet</h3>
+                    <p>Send a message to see it appear here in real-time!</p>
+                </div>
+            `;
+            messageCount = 0;
+            document.getElementById('message-count').textContent = '📨 Messages: 0';
+        }
     </script>
 </body>
 </html>
