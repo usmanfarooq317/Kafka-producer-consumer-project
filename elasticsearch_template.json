@@ -1,0 +1,45 @@
+{
+  "index_patterns": ["kafka-dashboard-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1,
+      "index.lifecycle.name": "kafka-dashboard-policy",
+      "index.lifecycle.rollover_alias": "kafka-dashboard"
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date"
+        },
+        "timestamp": {
+          "type": "date"
+        },
+        "message": {
+          "type": "text",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "sender": {
+          "type": "keyword"
+        },
+        "category": {
+          "type": "keyword"
+        },
+        "value": {
+          "type": "integer"
+        },
+        "kafka_offset": {
+          "type": "long"
+        },
+        "kafka_partition": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

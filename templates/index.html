@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kafka Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Kafka Dashboard</h1>
+            <div class="status">
+                <span id="kafka-status">Connected</span>
+                <span id="message-count">Messages: 0</span>
+            </div>
+        </header>
+
+        <div class="dashboard">
+            <div class="panel">
+                <h2>Send Message</h2>
+                <form id="message-form">
+                    <input type="text" id="sender" placeholder="Your name" value="User">
+                    <select id="category">
+                        <option value="info">Info</option>
+                        <option value="alert">Alert</option>
+                        <option value="warning">Warning</option>
+                    </select>
+                    <textarea id="message" placeholder="Enter message..."></textarea>
+                    <button type="submit">Send to Kafka</button>
+                </form>
+                <div id="send-status"></div>
+            </div>
+
+            <div class="panel">
+                <h2>Live Messages</h2>
+                <div class="messages" id="messages">
+                    <div class="empty">No messages yet</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="links">
+            <a href="http://localhost:5601" target="_blank">Kibana Dashboard</a>
+            <a href="http://localhost:9200" target="_blank">Elasticsearch API</a>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let messageCount = 0;
+
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            document.getElementById('kafka-status').textContent = 'Connected';
+        });
+
+        socket.on('new_message', (data) => {
+            messageCount++;
+            document.getElementById('message-count').textContent = `Messages: ${messageCount}`;
+            
+            const messagesDiv = document.getElementById('messages');
+            const emptyMsg = messagesDiv.querySelector('.empty');
+            if (emptyMsg) emptyMsg.remove();
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message';
+            messageDiv.innerHTML = `
+                <strong>${data.sender}</strong>
+                <span class="category ${data.category}">${data.category}</span>
+                <p>${data.message}</p>
+                <small>${new Date(data.timestamp).toLocaleTimeString()}</small>
+            `;
+            messagesDiv.prepend(messageDiv);
+        });
+
+        socket.on('send_status', (data) => {
+            const statusDiv = document.getElementById('send-status');
+            if (data.success) {
+                statusDiv.innerHTML = `<span class="success">✓ Sent (offset: ${data.offset})</span>`;
+            } else {
+                statusDiv.innerHTML = `<span class="error">✗ Failed: ${data.error}</span>`;
+            }
+            setTimeout(() => statusDiv.innerHTML = '', 3000);
+        });
+
+        document.getElementById('message-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const sender = document.getElementById('sender').value;
+            const category = document.getElementById('category').value;
+            const message = document.getElementById('message').value;
+            
+            if (!message.trim()) return;
+            
+            socket.emit('send_message', {
+                sender: sender,
+                category: category,
+                message: message,
+                value: Math.floor(Math.random() * 100) + 1
+            });
+            
+            document.getElementById('message').value = '';
+        });
+    </script>
+</body>
+</html>
