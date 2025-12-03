@@ -61,9 +61,11 @@ services:
       - elasticsearch
     volumes:
       - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+      - logstash-data:/usr/share/logstash/data 
     environment:
       LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     command: logstash -f /usr/share/logstash/pipeline/logstash.conf
+    
 
   # Dashboard Application
   dashboard-app:
@@ -84,4 +86,7 @@ services:
 
 volumes:
   elasticsearch-data:
+    driver: local
+
+  logstash-data:  # Add this
     driver: local

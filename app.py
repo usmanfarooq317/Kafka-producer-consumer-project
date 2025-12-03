@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify
 from flask_socketio import SocketIO, emit
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import threading
 import time
 import logging
@@ -64,7 +64,7 @@ class KafkaManager:
                 if not self.init_producer():
                     return {'success': False, 'error': 'Failed to connect to Kafka'}
             
-            data['timestamp'] = datetime.now().isoformat()
+            data['timestamp'] = datetime.now(timezone.utc).isoformat()
             
             # Send to Kafka
             future = self.producer.send(TOPIC, value=data)
